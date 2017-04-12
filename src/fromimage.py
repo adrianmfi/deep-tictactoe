@@ -92,7 +92,7 @@ def houghLineTransform(image):
 	return lineTransform/lineTransform.max()
 
 def testHLine():
-	img = cv2.imread('./testboards/board1.jpg')	
+	img = cv2.imread('../testboards/board4.jpg')	
 	lineTransform = houghLineTransform(img)
 	cv2.imshow('lineT',lineTransform)
 	cv2.waitKey()
