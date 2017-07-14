@@ -1,70 +1,98 @@
-#Made with python version 2.7.12
+#!/usr/bin/env python3
+'''
+Game of Tic tac toe.
+'''
+
 from toimage import toImage
 P1 = 'x'
 P2 = 'o'
-NONE = ' '
-'''
-Game of Tic tac toe.
-To play see main function
-'''
+EMPTY_FIELD = ' '
+
+
 class TicTacToe():
-	def __init__(self):
-		self.board = [[' ' for _ in range(3)] for _ in range(3)]
-		self.currentPlayer = P1
+    def __init__(self):
+        self.board = [[' ' for col in range(3)] for row in range(3)]
+        self.current_player = P1
+        self.finished = False
+        self.winner = None
 
-	def __str__(self):
-		return str(self.board[0]) + '\n' + str(self.board[1]) + '\n'+str(self.board[2])
+    def __str__(self):
+        return str(self.board[0]) + '\n' + str(self.board[1]) + '\n' + str(self.board[2])
 
-	def place(self,row,col):
-		assert self.board[row][col] == NONE, "board[row][col] is nonempty"
-		self.board[row][col] = self.currentPlayer
-		if self.currentPlayer == P1:
-			self.currentPlayer = P2
-		else:
-			self.currentPlayer = P1
+    def place(self, row, col):
+        if self.board[row][col] != EMPTY_FIELD:
+            raise ValueError(
+                "already placed at board[{}][{}]".format(row, col))
 
-	def isFinished(self):
-		#Check if someone has won
-		if self.getWinner() != NONE:
-			return True
-		#If not, check that there are possible moves
-		for i in range(3):
-			for j in range(3):
-				if self.board[i][j] == NONE:
-					return False
-		return True
+        self.board[row][col] = self.current_player
 
-	def getWinner(self):
-		#check horizontally and vertically
-		for i in range(3):
-			if self.board[i][0] != NONE and self.board[i][0] == self.board[i][1] == self.board[i][2]:
-				return self.board[i][1]
-			if self.board[0][i] != NONE and self.board[0][i] == self.board[1][i] == self.board[2][i]:
-				return self.board[1][i]
-		#Check diagonally
-		if self.board[0][0] != NONE and self.board[0][0] == self.board[1][1] == self.board[2][2]:
-			return self.board[1][1]
-		if self.board[0][2] != NONE and self.board[0][2] == self.board[1][1] == self.board[2][0]:
-			return self.board[1][1]
-		return NONE
+        if self.current_player == P1:
+            self.current_player = P2
+        else:
+            self.current_player = P1
 
-	def play(self):
-		while not self.isFinished():
-			print(self)
-			print('Player '+ self.currentPlayer + ' turn')
-			try:
-				row,col = input('Enter row,col: ')
-				self.place(row,col)
-				toImage(self.board,"board")
-			except:
-				print ("Placing failed")
-			print('\n')
-		print(self)
-		print ("Winner: " + self.getWinner())
+    def check_finished(self):
+        if self.finished:
+            return True
+        if self.check_winner() is not None:
+            return True
+
+        for i in range(3):
+            for j in range(3):
+                if self.board[i][j] == EMPTY_FIELD:
+                    return False
+        self.finished = True
+        return True
+
+    def check_winner(self):
+        if self.winner is not None:
+            return self.winner
+        elif self.finished:
+            return None
+
+        # check horizontally and vertically
+        for i in range(3):
+            if self.board[i][0] != EMPTY_FIELD and self.board[i][0] == self.board[i][1] == self.board[i][2]:
+                self.winner = self.board[i][1]
+                self.finished = True
+                return self.board[i][1]
+            if self.board[0][i] != EMPTY_FIELD and self.board[0][i] == self.board[1][i] == self.board[2][i]:
+                self.winner = self.board[i][1]
+                self.finished = True
+                return self.board[1][i]
+        # Check diagonally
+        if self.board[0][0] != EMPTY_FIELD and self.board[0][0] == self.board[1][1] == self.board[2][2]:
+            self.winner = self.board[0][0]
+            self.finished = True
+            return self.winner
+        if self.board[0][2] != EMPTY_FIELD and self.board[0][2] == self.board[1][1] == self.board[2][0]:
+            self.winner = self.board[0][2]
+            self.finished = True
+            return self.winner
+        return None
+
+
+def play_with_command_line():
+    game = TicTacToe()
+
+    while not game.check_finished():
+        print(game)
+        print('Player {}\'s turn'.format(game.current_player))
+        try:
+            row, col = map(int, input('Enter row,col: ').split(','))
+            game.place(row, col)
+        except (ValueError, IndexError) as e:
+            print(e)
+            continue
+            # toImage(game.board, "board")
+        print()
+    print(game)
+    print("Winner: " + game.winner)
+
 
 def main():
-	game = TicTacToe()
-	game.play()
+    play_with_command_line()
+
 
 if __name__ == '__main__':
-	main()
+    main()
