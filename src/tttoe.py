@@ -3,7 +3,7 @@
 Game of Tic tac toe.
 '''
 
-from image.toimage import to_image
+from image.board.toimage import to_image
 P1 = 'x'
 P2 = 'o'
 EMPTY_FIELD = ' '
@@ -55,11 +55,11 @@ class TicTacToe():
             if self.board[i][0] != EMPTY_FIELD and self.board[i][0] == self.board[i][1] == self.board[i][2]:
                 self.winner = self.board[i][1]
                 self.finished = True
-                return self.board[i][1]
+                return self.winner
             if self.board[0][i] != EMPTY_FIELD and self.board[0][i] == self.board[1][i] == self.board[2][i]:
-                self.winner = self.board[i][1]
+                self.winner = self.board[1][i]
                 self.finished = True
-                return self.board[1][i]
+                return self.winner
         # Check diagonally
         if self.board[0][0] != EMPTY_FIELD and self.board[0][0] == self.board[1][1] == self.board[2][2]:
             self.winner = self.board[0][0]

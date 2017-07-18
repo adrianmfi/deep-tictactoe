@@ -1,3 +1,4 @@
+import os
 from PIL import Image
 WIDTH = 512
 HEIGHT = 512
@@ -5,9 +6,13 @@ HEIGHT = 512
 
 def to_image(board_arr, img_name):
     img = Image.new("RGB", (WIDTH, HEIGHT))
-    circ = Image.open('./shapes/circle.png').resize((WIDTH //
-                                                     4, HEIGHT // 4), Image.ANTIALIAS)
-    cross = Image.open('./shapes/cross.png').resize((WIDTH // 4, HEIGHT // 4))
+    shapes_path = 'shapes'
+    rel_dir = os.path.dirname(__file__)
+
+    circ = Image.open(os.path.join(rel_dir, shapes_path, 'circle.png')).resize((WIDTH //
+                                                                                4, HEIGHT // 4), Image.ANTIALIAS)
+    cross = Image.open(os.path.join(rel_dir, shapes_path, 'cross.png')).resize((WIDTH //
+                                                                                4, HEIGHT // 4), Image.ANTIALIAS)
 
     pix = img.load()
     for x_pos in range(WIDTH):

@@ -23,15 +23,15 @@ def main():
     img_fname = 'test.png'
     font_fname = 'OpenSans-BoldItalic.ttf'
     font_folder = 'fonts'  # Relative to this file
-    data_folder = ''  # Relative to this file
+    data_folder = 'data'  # Relative to this file
 
-    dir = os.path.dirname(__file__)
-    font_path = os.path.join(dir, font_folder, font_fname)
+    rel_dir = os.path.dirname(__file__)
+    font_path = os.path.join(rel_dir, font_folder, font_fname)
 
     img = make_PIL_img_with_text(text_str, text_size, text_pos,
                                  text_intensity, img_size, bg_intensity, font_path)
 
-    img_path = os.path.join(dir, data_folder, img_fname)
+    img_path = os.path.join(rel_dir, data_folder, img_fname)
     img.save(img_path)
 
 
