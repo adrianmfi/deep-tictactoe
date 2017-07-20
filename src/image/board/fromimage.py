@@ -1,14 +1,23 @@
+import os
 import math
 import time
+
 import cv2
 import numpy as np
+import torch
+from PIL import Image
+from torchvision import transforms
+from torch.autograd import Variable
 
+
+import image.mark_detect as md
+from image.mark_detect.models.custom_model import Net
 crosspath = './shapes/cross.png'
 
 
 def from_image(filename):
     ret = [[' ', ' ', ' '], ['', ' ', ' '], [' ', ' ', ' ']]
-    board_img = cv2.imread(filename)
+    board_img = Image.open(filename).convert('L')
 
     # Divide board into 9 pics and search each individual pic
     # How to find the squares:
@@ -21,23 +30,42 @@ def from_image(filename):
 
 
 def split_board_into_tiles(board_img):
-    height, width = board_img.shape[:2]
+    width, height = board_img.size
     tiles = [[None for i in range(3)] for j in range(3)]
     for i in range(3):
         for j in range(3):
-            tiles[i][j] = board_img[i * height //
-                                    3:(i + 1) * height // 3, j * height // 3:(j + 1) * height // 3]
+            box = (j * width // 3, i * height // 3,
+                   (j + 1) * width // 3, (i + 1) * height // 3)
+            tiles[i][j] = board_img.crop(box)
     return tiles
 
 
 def detect_mark(tile):
-    import random
-    if random.random() < 0.33:
+    tile = tile.resize((64, 64))  # TODO: Fix size here
+    rel_dir = os.path.dirname(__file__)
+    model_path = os.path.join(
+        rel_dir, '..', 'mark_detect', 'checkpoints', 'model_best.pth.tar')
+    model = Net()
+    if not os.path.isfile(model_path):
+        raise FileNotFoundError('Could not find trained model')
+
+    checkpoint = torch.load(model_path)  # TODO load outside of func
+    model.load_state_dict(checkpoint['state_dict'])
+    transform = transforms.ToTensor()
+    data = transform(tile)
+    data = data.view(1, 1, 64, 64)
+    data = Variable(data)
+    output = model(data)
+    pred = output.data.max(1)[1]
+    pred = pred[0].numpy()[0]
+    if pred == 0:
         return 'x'
-    elif random.random() < 0.66:
+    elif pred == 1:
         return 'o'
-    else:
+    elif pred == 2:
         return ' '
+    else:
+        raise ValueError("Model gives wrong output")
 
 
 '''

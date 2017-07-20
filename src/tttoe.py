@@ -4,6 +4,8 @@ Game of Tic tac toe.
 '''
 
 from image.board.toimage import to_image
+from image.board.fromimage import from_image
+
 P1 = 'x'
 P2 = 'o'
 EMPTY_FIELD = ' '
@@ -84,7 +86,12 @@ def play_with_command_line():
         except (ValueError, IndexError) as e:
             print(e)
             continue
-        to_image(game.board, "board")
+        to_image(game.board, 'board')
+        board_guess = from_image('board.png')
+        print('guessed:')
+        print(str(board_guess[0]) + '\n' +
+              str(board_guess[1]) + '\n' + str(board_guess[2]))
+        print()
         print()
     print(game)
     if game.winner is not None:
