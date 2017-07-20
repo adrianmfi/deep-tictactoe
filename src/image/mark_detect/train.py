@@ -1,20 +1,18 @@
-from __future__ import print_function
-from __future__ import division
+import os
+import time
 import argparse
+import shutil
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import datasets, transforms, models
+from torchvision import datasets, transforms, models, utils
 from torch.autograd import Variable
 
-import time
-import shutil
-import os
-import numpy as np
-from dataset.dataset_imagenet import ImageNet
-from torchvision import utils
-
+import models.custom_model as custom
+from dataset import tttoe_data
 # Training settings
 parser = argparse.ArgumentParser(description='ECE281 CNN Image classification')
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
@@ -23,6 +21,8 @@ parser.add_argument('--test-batch-size', type=int, default=100, metavar='N',
                     help='input batch size for testing (default: 100)')
 parser.add_argument('--epochs', type=int, default=10, metavar='N',
                     help='number of epochs to train (default: 10)')
+parser.add_argument('--decay-epochs', type=int, default=10, metavar='N',
+                    help='divide lr by 10 every decay-epochs (default: 10)')
 parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                     help='learning rate (default: 0.001)')
 parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
@@ -40,8 +40,12 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
 
 
 def main():
-	args = parser.parse_args()
-	bestPrecision = 0
+    args = parser.parse_args()
+    best_precision = 0
+    dataset_size = 4096
+    image_size = 64
+    text_size = 30
+    rand_offs = 10
 
     # Use CUDA if available
     args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -49,139 +53,129 @@ def main():
     torch.manual_seed(args.seed)
     if args.cuda:
         torch.cuda.manual_seed(args.seed)
-   
+
     # Set up the data loaders
-    kwargs = {'num_workers': args.workers,
-              'pin_memory': True} if args.cuda else {}
-    trainLoader = torch.utils.data.DataLoader(
-        ImageNet('data', mode='train', transform=transforms.Compose([
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize([0.478571, 0.44496, 0.392131], [
-                                 0.26412, 0.255156, 0.269064])
-        ])),
-        batch_size=args.batch_size, shuffle=True, **kwargs)
-    valLoader = torch.utils.data.DataLoader(
-        ImageNet('data', mode='validate', transform=transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize([0.478571, 0.44496, 0.392131], [
-                                 0.26412, 0.255156, 0.269064])
-        ])),
-        batch_size=args.batch_size, shuffle=False, **kwargs)
+    cuda_kwargs = {'num_workers': args.workers,
+                   'pin_memory': True} if args.cuda else {}
+    train_loader = torch.utils.data.DataLoader(
+        tttoe_data.Tttoe_dataset(
+            dataset_size, image_size, text_size, rand_offs, img_transform=transforms.ToTensor()),
+        batch_size=args.batch_size, shuffle=True, **cuda_kwargs)
+    val_loader = torch.utils.data.DataLoader(
+        tttoe_data.Tttoe_dataset(
+            dataset_size, image_size, text_size, rand_offs, img_transform=transforms.ToTensor()),
+        batch_size=args.batch_size, shuffle=True, **cuda_kwargs)
 
     # Set up the model, optimizer and loss function
-    model = models.resnet18(pretrained=True)
-    num_ftrs = model.fc.in_features
-    for param in model.parameters():
-        param.requires_grad = False
-    model.fc = nn.Linear(num_ftrs, 100)
+    model = custom.Net()
     criterion = nn.CrossEntropyLoss()
-    # optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    # optimizer = optim.SGD(model.parameters(), lr=args.lr,momentum=args.momentum)
-    optimizer = optim.SGD(model.fc.parameters(),
-                          lr=args.lr, momentum=args.momentum)
+    optimizer = optim.SGD(model.parameters(), lr=args.lr,
+                          momentum=args.momentum)
 
     if args.cuda:
         model.cuda()
         criterion = criterion.cuda()
-    startEpoch = 1
+    start_epoch = 1
 
-    testAcc = []
-    testLoss = []
-    valAcc = []
-    valLoss = []
+    test_accs = []
+    test_losses = []
+    val_accs = []
+    val_losses = []
+
     # Resume from checkpoint if specified
     if args.resume:
         if os.path.isfile(args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
-            startEpoch = checkpoint['epoch']
-            bestPrecision = float(checkpoint['best_precision'])
-            print('Best prediction: ', bestPrecision)
+            start_epoch = checkpoint['epoch']
+            best_precision = float(checkpoint['best_precision'])
+            print('Best prediction: ', best_precision)
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
-            testAcc = checkpoint['testAcc']
-            testLoss = checkpoint['testLoss']
-            valAcc = checkpoint['valAcc']
-            valLoss = checkpoint['valLoss']
+            test_accs = checkpoint['testAcc']
+            test_losses = checkpoint['testLoss']
+            val_accs = checkpoint['valAcc']
+            val_losses = checkpoint['valLoss']
 
             print("=> loaded checkpoint (epoch {})"
                   .format(checkpoint['epoch']))
     # Train
-    for epoch in range(startEpoch, startEpoch + args.epochs + 1):
-        exp_lr_scheduler(optimizer, epoch, args.lr)
-        startTime = time.clock()
-        tAcc, tLoss = train(trainLoader, model, criterion, optimizer, epoch)
-        endTime = time.clock()
-        print('Time used training for epoch: ', (endTime - startTime))
-        vAcc, vLoss = validate(valLoader, model, criterion)
-        isBest = False
-        if vAcc > bestPrecision:
-            bestPrecision = vAcc
-            isBest = True
-        print('Precision:', vAcc)
-        print('Best precision:', bestPrecision)
-        testAcc.append(tAcc)
-        testLoss.append(tLoss)
-        valAcc.append(vAcc)
-        valLoss.append(vLoss)
+    for epoch in range(start_epoch, start_epoch + args.epochs + 1):
+        exp_lr_scheduler(optimizer, epoch, args.lr, args.decay_epochs)
+        start_time = time.clock()
+        test_acc, test_loss = train(train_loader, model, criterion,
+                                    optimizer, epoch, args.cuda, args.log_interval)
+        end_time = time.clock()
+        print('Time used training for epoch: ', (end_time - start_time))
+        val_acc, val_loss = validate(val_loader, model, criterion, args.cuda)
+        is_best = False
+        if val_acc > best_precision:
+            best_precision = val_acc
+            is_best = True
+        print('Precision:', val_acc)
+        print('Best precision:', best_precision)
+        test_accs.append(test_acc)
+        test_losses.append(test_loss)
+        val_accs.append(val_acc)
+        val_losses.append(val_loss)
         saveCheckpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
-            'best_precision': bestPrecision,
+            'best_precision': best_precision,
             'optimizer': optimizer.state_dict(),
-            'testAcc': testAcc,
-            'testLoss': testLoss,
-            'valAcc': valAcc,
-            'valLoss': valLoss,
-        }, isBest)
+            'testAcc': test_accs,
+            'testLoss': test_losses,
+            'valAcc': val_accs,
+            'valLoss': val_losses,
+        }, is_best)
         print()
 
 
-def train(trainLoader, model, criterion, optimizer, epoch):
+def train(train_loader, model, criterion, optimizer, epoch, cuda, log_interval):
     model.train()
-    trainLoss = 0
+    train_loss = 0
     correct = 0
-    for batchIdx, (data, target) in enumerate(trainLoader):
-        if args.cuda:
+    for batch_idx, (data, target) in enumerate(train_loader):
+        if cuda:
             data, target = data.cuda(), target.cuda()
         data, target = Variable(data), Variable(target)
         optimizer.zero_grad()
         output = model(data)
         loss = criterion(output, target)
-        trainLoss += loss.data[0]
-        # get the index of the max log-probability
+        train_loss += loss.data[0]
+        # get the index of the max probability
         pred = output.data.max(1)[1]
         correct += pred.eq(target.data).cpu().sum()
         loss.backward()
         optimizer.step()
-        if batchIdx % args.log_interval == 0:
+        if batch_idx % log_interval == 0:
             print('\nTrain Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batchIdx * len(data), len(trainLoader.dataset),
-                100. * batchIdx / len(trainLoader), loss.data[0]))
+                epoch, batch_idx * len(data), len(train_loader.dataset),
+                100. * batch_idx / len(train_loader), loss.data[0]))
     # loss function already averages over batch size
-    trainLoss /= len(trainLoader)
-    return correct / len(trainLoader.dataset), trainLoss
+    train_loss /= len(train_loader)
+    return correct / len(train_loader.dataset), train_loss
 
 
-def validate(valLoader, model, criterion):
+def validate(val_loader, model, criterion, use_cuda):
     model.eval()
-    valLoss = 0
+    val_loss = 0
     correct = 0
-    for idx, (data, target) in enumerate(valLoader):
-        if args.cuda:
+    for (data, target) in val_loader:
+        if use_cuda:
             data, target = data.cuda(), target.cuda()
         data, target = Variable(data, volatile=True), Variable(target)
         output = model(data)
-        valLoss += criterion(output, target).data[0]
+        val_loss += criterion(output, target).data[0]
         # get the index of the max log-probability
         pred = output.data.max(1)[1]
         correct += pred.eq(target.data).cpu().sum()
-    valLoss /= len(valLoader)  # loss function already averages over batch size
+    # loss function already averages over batch size
+    val_loss /= len(val_loader)
     print('Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
-        valLoss, correct, len(valLoader.dataset),
-        100. * correct / len(valLoader.dataset)))
-    return correct / len(valLoader.dataset), valLoss
+        val_loss, correct, len(val_loader.dataset),
+        100. * correct / len(val_loader.dataset)))
+    return correct / len(val_loader.dataset), val_loss
 
 
 def exp_lr_scheduler(optimizer, epoch, init_lr, lr_decay_epoch=20):
@@ -195,10 +189,10 @@ def exp_lr_scheduler(optimizer, epoch, init_lr, lr_decay_epoch=20):
         param_group['lr'] = lr
 
 
-def saveCheckpoint(state, isBest, filename='saved_models/checkpoint.pth.tar'):
+def saveCheckpoint(state, is_best, filename='checkpoints/checkpoint.pth.tar'):
     torch.save(state, filename)
-    if isBest:
-        shutil.copy(filename, 'saved_models/model_best.pth.tar')
+    if is_best:
+        shutil.copy(filename, 'checkpoints/model_best.pth.tar')
 
 
 if __name__ == '__main__':
