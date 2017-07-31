@@ -4,6 +4,7 @@ import argparse
 import shutil
 
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -44,8 +45,8 @@ def main():
     best_precision = 0
     dataset_size = 4096
     image_size = 64
-    text_size = 30
-    rand_offs = 10
+    text_size = 50
+    rand_offs = 20
 
     # Use CUDA if available
     args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -59,11 +60,11 @@ def main():
                    'pin_memory': True} if args.cuda else {}
     train_loader = torch.utils.data.DataLoader(
         tttoe_data.Tttoe_dataset(
-            dataset_size, image_size, text_size, rand_offs, img_transform=transforms.ToTensor()),
+            dataset_size, image_size, text_size, rand_offs, noise_alpha=0.1, img_transform=transforms.ToTensor()),
         batch_size=args.batch_size, shuffle=True, **cuda_kwargs)
     val_loader = torch.utils.data.DataLoader(
         tttoe_data.Tttoe_dataset(
-            dataset_size, image_size, text_size, rand_offs, img_transform=transforms.ToTensor()),
+            dataset_size, image_size, text_size, 1, img_transform=transforms.ToTensor()),
         batch_size=args.batch_size, shuffle=True, **cuda_kwargs)
 
     # Set up the model, optimizer and loss function
@@ -118,7 +119,7 @@ def main():
         test_losses.append(test_loss)
         val_accs.append(val_acc)
         val_losses.append(val_loss)
-        saveCheckpoint({
+        state = {
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
             'best_precision': best_precision,
@@ -127,7 +128,10 @@ def main():
             'testLoss': test_losses,
             'valAcc': val_accs,
             'valLoss': val_losses,
-        }, is_best)
+        }
+        model_fname = os.path.join(os.path.dirname(
+            __file__), 'checkpoints', 'checkpoint.pth.tar')
+        save_checkpoint(state, is_best, model_fname)
         print()
 
 
@@ -164,17 +168,18 @@ def validate(val_loader, model, criterion, use_cuda):
     for (data, target) in val_loader:
         if use_cuda:
             data, target = data.cuda(), target.cuda()
-        data, target = Variable(data, volatile=True), Variable(target)
-        output = model(data)
-        val_loss += criterion(output, target).data[0]
+        data_v, target_v = Variable(data, volatile=True), Variable(target)
+        output = model(data_v)
+        val_loss += criterion(output, target_v).data[0]
         # get the index of the max log-probability
         pred = output.data.max(1)[1]
-        correct += pred.eq(target.data).cpu().sum()
+        correct += pred.eq(target_v.data).cpu().sum()
     # loss function already averages over batch size
     val_loss /= len(val_loader)
     print('Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
         val_loss, correct, len(val_loader.dataset),
         100. * correct / len(val_loader.dataset)))
+    imshow(utils.make_grid(data), [float(x) for x in pred.numpy()])
     return correct / len(val_loader.dataset), val_loss
 
 
@@ -189,10 +194,18 @@ def exp_lr_scheduler(optimizer, epoch, init_lr, lr_decay_epoch=20):
         param_group['lr'] = lr
 
 
-def saveCheckpoint(state, is_best, filename='checkpoints/checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, filename):
     torch.save(state, filename)
     if is_best:
         shutil.copy(filename, 'checkpoints/model_best.pth.tar')
+
+
+def imshow(img, labels):
+    img = img / 2 + 0.5     # unnormalize
+    npimg = img.numpy()
+    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    plt.title(labels)
+    plt.show()
 
 
 if __name__ == '__main__':
