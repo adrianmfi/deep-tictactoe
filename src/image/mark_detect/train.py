@@ -44,9 +44,9 @@ def main():
     args = parser.parse_args()
     best_precision = 0
     dataset_size = 4096
-    image_size = 64
-    text_size = 50
-    rand_offs = 20
+    side_length = 76
+    text_size = 60
+    rand_text_offs = 10
 
     # Use CUDA if available
     args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -59,12 +59,14 @@ def main():
     cuda_kwargs = {'num_workers': args.workers,
                    'pin_memory': True} if args.cuda else {}
     train_loader = torch.utils.data.DataLoader(
-        tttoe_data.Tttoe_dataset(
-            dataset_size, image_size, text_size, rand_offs, noise_alpha=0.1, img_transform=transforms.ToTensor()),
+        tttoe_data.TttoeDataset(dataset_size, side_length, text_size, rand_text_offs, 0.2, [
+            0, 0, side_length, side_length],
+            transforms.Compose([tttoe_data.RandomRotate(20), transforms.CenterCrop(64), transforms.ToTensor()])),
         batch_size=args.batch_size, shuffle=True, **cuda_kwargs)
     val_loader = torch.utils.data.DataLoader(
-        tttoe_data.Tttoe_dataset(
-            dataset_size, image_size, text_size, 1, img_transform=transforms.ToTensor()),
+        tttoe_data.TttoeDataset(dataset_size, side_length, text_size, rand_text_offs, 0.2, [
+            0, 0, side_length, side_length],
+            transforms.Compose([tttoe_data.RandomRotate(20), transforms.CenterCrop(64), transforms.ToTensor()])),
         batch_size=args.batch_size, shuffle=True, **cuda_kwargs)
 
     # Set up the model, optimizer and loss function
@@ -129,9 +131,7 @@ def main():
             'valAcc': val_accs,
             'valLoss': val_losses,
         }
-        model_fname = os.path.join(os.path.dirname(
-            __file__), 'checkpoints', 'checkpoint.pth.tar')
-        save_checkpoint(state, is_best, model_fname)
+        save_checkpoint(state, is_best)
         print()
 
 
@@ -194,10 +194,15 @@ def exp_lr_scheduler(optimizer, epoch, init_lr, lr_decay_epoch=20):
         param_group['lr'] = lr
 
 
-def save_checkpoint(state, is_best, filename):
-    torch.save(state, filename)
+def save_checkpoint(state, is_best):
+    model_fname = os.path.join(os.path.dirname(
+        __file__), 'checkpoints', 'checkpoint.pth.tar')
+    model_best_fname = os.path.join(os.path.dirname(
+        __file__), 'checkpoints', 'model_best.pth.tar')
+
+    torch.save(state, model_fname)
     if is_best:
-        shutil.copy(filename, 'checkpoints/model_best.pth.tar')
+        shutil.copy(model_fname, model_best_fname)
 
 
 def imshow(img, labels):

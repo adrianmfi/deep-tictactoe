@@ -1,0 +1,1 @@
+Convolutional network for detecting value in tic tac toe tiles
