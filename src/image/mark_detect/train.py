@@ -16,7 +16,7 @@ import models.custom_model as custom
 from dataset import tttoe_data
 # Training settings
 parser = argparse.ArgumentParser(description='ECE281 CNN Image classification')
-parser.add_argument('--batch-size', type=int, default=64, metavar='N',
+parser.add_argument('--batch-size', type=int, default=16, metavar='N',
                     help='input batch size for training (default: 64)')
 parser.add_argument('--test-batch-size', type=int, default=100, metavar='N',
                     help='input batch size for testing (default: 100)')
@@ -43,7 +43,8 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
 def main():
     args = parser.parse_args()
     best_precision = 0
-    dataset_size = 4096
+    train_size = 4096 * 2
+    validate_size = 2048
     side_length = 76
     text_size = 60
     rand_text_offs = 10
@@ -59,12 +60,12 @@ def main():
     cuda_kwargs = {'num_workers': args.workers,
                    'pin_memory': True} if args.cuda else {}
     train_loader = torch.utils.data.DataLoader(
-        tttoe_data.TttoeDataset(dataset_size, side_length, text_size, rand_text_offs, 0.2, [
+        tttoe_data.TttoeDataset(train_size, side_length, text_size, rand_text_offs, 0.2, [
             0, 0, side_length, side_length],
             transforms.Compose([tttoe_data.RandomRotate(20), transforms.CenterCrop(64), transforms.ToTensor()])),
         batch_size=args.batch_size, shuffle=True, **cuda_kwargs)
     val_loader = torch.utils.data.DataLoader(
-        tttoe_data.TttoeDataset(dataset_size, side_length, text_size, rand_text_offs, 0.2, [
+        tttoe_data.TttoeDataset(validate_size, side_length, text_size, rand_text_offs, 0.2, [
             0, 0, side_length, side_length],
             transforms.Compose([tttoe_data.RandomRotate(20), transforms.CenterCrop(64), transforms.ToTensor()])),
         batch_size=args.batch_size, shuffle=True, **cuda_kwargs)

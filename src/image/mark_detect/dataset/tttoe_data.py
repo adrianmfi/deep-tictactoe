@@ -59,11 +59,11 @@ class TttoeDataset(data.Dataset):
             char = choice(chars)
             rand_offset = randint(-rand_offset_limit, rand_offset_limit, 2)
             if char == 'x' or char == 'X':
-                target = 0
-            elif char == 'o' or char == 'O':
                 target = 1
-            else:
+            elif char == 'o' or char == 'O':
                 target = 2
+            else:
+                target = 0
             img = self.make_data(char, text_size, rand_offset, 0,
                                  self.size, 255, choice(fonts))
 
