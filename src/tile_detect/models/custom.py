@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class Net(nn.Module):
+class Net1(nn.Module):
     def __init__(self, num_classes=3):
         super(Net, self).__init__()
         self.conv1 = nn.Conv2d(1, 8, 3, 1, 1)

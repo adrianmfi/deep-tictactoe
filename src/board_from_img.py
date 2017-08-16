@@ -1,6 +1,5 @@
 import os
 
-
 import cv2
 import numpy as np
 import torch
@@ -9,7 +8,7 @@ from torchvision import transforms
 import PIL
 from PIL import Image
 import matplotlib.pyplot as plt
-import mark_detect.models.custom_model as custom_model
+import tile_detect.detect as dt
 
 
 from sklearn.cluster import DBSCAN
@@ -18,15 +17,7 @@ from sklearn.cluster import DBSCAN
 def board_from_image(board_img):
     board_img = board_img.convert('L')
     tiles = split_board_into_tiles(board_img)
-    return [[detect_mark(tile) for tile in row] for row in tiles]
-
-
-def wrap_line(line):
-    rho, theta = line
-    if rho < 0:
-        rho = -rho
-        theta = theta - np.pi
-    return rho, theta
+    return [[dt.detect(tile) for tile in row] for row in tiles]
 
 
 def split_board_into_tiles(board_img):
@@ -80,7 +71,9 @@ def split_board_into_tiles(board_img):
 
     tile_corners = calc_corners(
         vertical_lines, horizontal_lines)
-
+    print(tile_corners)
+    plt.imshow(img)
+    plt.show()
     # Transform input image into tiles
     tiles = [[None for i in range(3)] for j in range(3)]
     for i in range(3):
@@ -89,8 +82,16 @@ def split_board_into_tiles(board_img):
                 (tile_corners[i][j], tile_corners[i + 1][j],
                  tile_corners[i + 1][j + 1], tile_corners[i][j + 1]))
             tiles[i][j] = board_img.transform((64, 64), PIL.Image.QUAD, data)
-            tiles[i][j].show()
+            # tiles[i][j].show()
     return tiles
+
+
+def wrap_line(line):
+    rho, theta = line
+    if rho < 0:
+        rho = -rho
+        theta = theta - np.pi
+    return rho, theta
 
 
 def calc_corners(vertical_lines, horizontal_lines):
@@ -121,35 +122,6 @@ def polar_line_to_euclidian(line):
     b = np.sin(theta)
     c = - rho
     return np.array([a, b, c])
-
-
-def detect_mark(tile):
-    tile = tile.resize((64, 64))  # TODO: Fix size here
-    rel_dir = os.path.dirname(__file__)
-    model_path = os.path.join(
-        rel_dir, 'mark_detect', 'checkpoints', 'model_best.pth.tar')
-    model = custom_model.Net()
-    if not os.path.isfile(model_path):
-        raise FileNotFoundError('Could not find trained model')
-
-    checkpoint = torch.load(model_path)  # TODO load outside of func
-    model.load_state_dict(checkpoint['state_dict'])
-    model.eval()
-    transform = transforms.ToTensor()
-    data = transform(tile)
-    data = data.view(1, 1, 64, 64)
-    data = Variable(data)
-    output = model(data)
-    pred = output.data.max(1)[1]
-    pred = pred[0].numpy()[0]
-    if pred == 0:
-        return 'x'
-    elif pred == 1:
-        return 'o'
-    elif pred == 2:
-        return ' '
-    else:
-        raise ValueError("Model gives wrong output")
 
 
 def main():

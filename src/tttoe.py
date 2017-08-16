@@ -9,8 +9,10 @@ def to_string(field):
         return ' '
     elif field == 1:
         return 'x'
-    else:
+    elif field == 2:
         return 'o'
+    else:
+        raise ValueError('Wrong field, expected 0,1 or 2')
 
 
 class TicTacToe():

@@ -36,17 +36,17 @@ def to_image(board_arr, img_name):
             pix[x_pos, y_pos] = (0, 0, 0)
     for i in range(3):
         for j in range(3):
-            if board_arr[i][j] == 'x':
+            if board_arr[i][j] == 1:
                 img.paste(cross, (WIDTH * j // 3 + HEIGHT //
                                   25, WIDTH // 25 + WIDTH * i // 3))
-            elif board_arr[i][j] == 'o':
+            elif board_arr[i][j] == 2:
                 img.paste(circ, (WIDTH * j // 3 + HEIGHT //
                                  25, WIDTH // 25 + WIDTH * i // 3))
-            elif not board_arr[i][j] == ' ':
+            elif not board_arr[i][j] == 0:
                 raise ValueError(
                     'Board [{}][{}] = {}'.format(i, j, board_arr[i][j]))
-    img.save(img_name + ".png", "PNG")
+    img.save(img_name + ".jpg")
 
 
 if __name__ == '__main__':
-    to_image([[' ', ' ', 'x'], [' ', ' ', 'x'], ['o', ' ', ' ']], "test")
+    to_image([[2, 0, 1], [0, 0, 1], [2, 1, 0]], "test")
